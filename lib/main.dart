@@ -336,3 +336,254 @@ class _RegisterEmailSectionState extends State<RegisterEmailSection> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class EmailPasswordForm extends StatefulWidget {
+  EmailPasswordForm({Key? key, required this.auth}) : super(key: key);
+  final FirebaseAuth auth;
+
+  @override
+  _EmailPasswordFormState createState() => _EmailPasswordFormState();
+}
+
+class _EmailPasswordFormState extends State<EmailPasswordForm> {
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  bool _success = false;
+  bool _initialState = true;
+  String _userEmail = '';
+
+  void _signInWithEmailAndPassword() async {
+    try {
+      await widget.auth.signInWithEmailAndPassword(
+        email: _emailController.text,
+        password: _passwordController.text,
+      );
+      setState(() {
+        _success = true;
+        _userEmail = _emailController.text;
+        _initialState = false;
+      });
+    } catch (e) {
+      setState(() {
+        _success = false;
+        _initialState = false;
+      });
+    }
+  }
+
+  void _resetPassword() async {
+    try {
+      await widget.auth.sendPasswordResetEmail(email: _emailController.text);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Password reset email sent. Please check your inbox.'),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error sending password reset email.'),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Container(
+            child: Text('Welcome Back Login Now!'),
+            padding: const EdgeInsets.all(16),
+            alignment: Alignment.center,
+          ),
+          TextFormField(
+            controller: _emailController,
+            decoration: InputDecoration(labelText: 'Email'),
+            validator: (value) {
+              if (value?.isEmpty ?? true) {
+                return 'Please enter some text';
+              }
+              return null;
+            },
+          ),
+          TextFormField(
+            controller: _passwordController,
+            decoration: InputDecoration(labelText: 'Password'),
+            validator: (value) {
+              if (value?.isEmpty ?? true) {
+                return 'Please enter some text';
+              }
+              return null;
+            },
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 16.0),
+            alignment: Alignment.center,
+            child: ElevatedButton(
+              onPressed: () {
+                if (_formKey.currentState!.validate()) {
+                  _signInWithEmailAndPassword();
+                }
+              },
+              child: Text('Login'),
+            ),
+          ),
+          Container(
+            alignment: Alignment.center,
+            child: Text(
+              _initialState
+                  ? ''
+                  : _success
+                      ? 'Successfully signed in $_userEmail'
+                      : 'Sign in failed',
+              style: TextStyle(color: _success ? Colors.green : Colors.red),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              _resetPassword();
+            },
+            child: Text('Forgot Password'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+Widget _buildArtworksGridView() {
+  List<String> imagePaths = [
+    'assets/art1.jpg',
+    'assets/art2.jpg',
+    'assets/art3.jpg',
+    'assets/art4.jpg',
+    'assets/art5.jpg',
+    'assets/art6.jpg',
+  ];
+  List<String> artworkNames = [
+    'Colored Dog',
+    'Glass Half Sideways',
+    'Childhood Home',
+    'Frida Kahlo',
+    'Picasso',
+    'Lion',
+  ];
+  List<String> artistNames = [
+    'Samantha X',
+    'Richard D',
+    'Micheal M',
+    'Megan F',
+    'Blake G',
+    'Isabel M',
+  ];
+  List<String> descriptions = [
+    ' A vibrant portrait capturing the essence of a colorful canine companion.',
+    ' An abstract depiction of a tilted glass, presenting an unconventional perspective on everyday objects.',
+    'A nostalgic portrayal evoking memories of the artists early years and the warmth of home.',
+    'A tribute to the iconic Mexican artist, reflecting her distinctive style and indomitable spirit.',
+    'An artistic homage inspired by the avant-garde works of the renowned Spanish painter, Pablo Picasso.',
+    'An artistic homage inspired by the avant-garde works of the renowned Spanish painter, Pablo Picasso.',
+  ];
+
+  return Container(
+    color: Color.fromARGB(223, 209, 207, 207),
+    child: GridView.builder(
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+      ),
+      itemCount: imagePaths.length,
+      itemBuilder: (context, index) {
+        return GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ArtworkDetailScreen(
+                  artworkName: artworkNames[index],
+                  artistName: artistNames[index],
+                  description: descriptions[index],
+                ),
+              ),
+            );
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage(imagePaths[index]),
+                fit: BoxFit.cover,
+              ),
+            ),
+            alignment: Alignment.center,
+          ),
+        );
+      },
+    ),
+  );
+}
+
+class ArtworkDetailScreen extends StatelessWidget {
+  final String artworkName;
+  final String artistName;
+  final String description;
+
+  ArtworkDetailScreen({
+    required this.artworkName,
+    required this.artistName,
+    required this.description,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Artwork Detail'),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              artworkName,
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 10),
+            Text(
+              'By $artistName',
+              style: TextStyle(fontSize: 18),
+            ),
+            SizedBox(height: 10),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text(
+                description,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 18),
+              ),
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => ChatScreen()),
+                );
+              },
+              child: Text('Message Me'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
