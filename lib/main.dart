@@ -587,6 +587,7 @@ class ArtworkDetailScreen extends StatelessWidget {
     );
   }
 }
+
 class UploadScreen extends StatefulWidget {
   @override
   _UploadScreenState createState() => _UploadScreenState();
@@ -838,6 +839,131 @@ class ProfileScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class SignUpPage extends StatelessWidget {
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _bioController = TextEditingController();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Sign Up'),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            TextFormField(
+              controller: _emailController,
+              decoration: InputDecoration(
+                labelText: 'Email',
+              ),
+            ),
+            SizedBox(height: 20),
+            TextFormField(
+              controller: _passwordController,
+              decoration: InputDecoration(
+                labelText: 'Password',
+              ),
+              obscureText: true,
+            ),
+            SizedBox(height: 20),
+            TextFormField(
+              controller: _bioController,
+              decoration: InputDecoration(
+                labelText: 'Bio',
+              ),
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                _register(context);
+              },
+              child: Text('Sign Up'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _register(BuildContext context) async {
+    try {
+      UserCredential userCredential =
+          await _auth.createUserWithEmailAndPassword(
+        email: _emailController.text,
+        password: _passwordController.text,
+      );
+      await _firestore.collection('users').doc(userCredential.user!.uid).set({
+        'uid': userCredential.user!.uid,
+        'email': _emailController.text,
+        'password': _passwordController.text,
+        'bio': _bioController.text,
+      });
+
+      if (userCredential.user != null) {
+        _showSuccessAlert(context);
+
+        Navigator.pushReplacementNamed(context, '/login');
+      } else {
+        _showErrorAlert(
+            context, 'Registration failed. Please try again later.');
+      }
+    } catch (e) {
+      if (e is FirebaseAuthException) {
+        if (e.code == 'email-already-in-use') {
+          _showErrorAlert(context,
+              'Email is already in use. Please try a different email.');
+        }
+      }
+    }
+  }
+
+  void _showSuccessAlert(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Success'),
+          content: Text('Your account has been created successfully.'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showErrorAlert(BuildContext context, String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Error'),
+          content: Text(message),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('OK'),
+            ),
+          ],
+        );
+      },
     );
   }
 }
