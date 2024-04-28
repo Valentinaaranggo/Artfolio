@@ -587,3 +587,257 @@ class ArtworkDetailScreen extends StatelessWidget {
     );
   }
 }
+class UploadScreen extends StatefulWidget {
+  @override
+  _UploadScreenState createState() => _UploadScreenState();
+}
+
+class _UploadScreenState extends State<UploadScreen> {
+  PickedFile? _pickedFile;
+  String _description = '';
+
+  Future<void> selectFile() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles();
+    if (result != null) {
+      setState(() {
+        _pickedFile = PickedFile(result.files.first.path!);
+      });
+    }
+  }
+
+  Future<void> uploadFile() async {
+    if (_pickedFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No file selected'),
+        ),
+      );
+      return;
+    }
+
+    FirebaseStorage storage = FirebaseStorage.instance;
+    Reference storageRef =
+        storage.ref().child('artworks').child(DateTime.now().toString());
+
+    UploadTask uploadTask = storageRef.putFile(File(_pickedFile!.path));
+
+    await uploadTask.whenComplete(() async {
+      String imageUrl = await storageRef.getDownloadURL();
+
+      FirebaseFirestore.instance.collection('artworks').add({
+        'description': _description,
+        'imageUrl': imageUrl,
+      }).then((DocumentReference document) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Artwork uploaded successfully'),
+          ),
+        );
+
+        User? user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+            'artworks': FieldValue.arrayUnion([document.id]),
+          });
+        }
+
+        setState(() {
+          _description = '';
+          _pickedFile = null;
+        });
+      }).catchError((error) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error uploading artwork'),
+          ),
+        );
+      });
+    }).catchError((error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error uploading image'),
+        ),
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Upload Artwork'),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              decoration: InputDecoration(labelText: 'Description'),
+              onChanged: (value) {
+                setState(() {
+                  _description = value;
+                });
+              },
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: selectFile,
+              child: Text('Select Artwork'),
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: uploadFile,
+              child: Text('Upload Artwork'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class ProfileScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    User? user = FirebaseAuth.instance.currentUser;
+    String userEmail = user != null ? user.email ?? '' : '';
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Profile'),
+      ),
+      backgroundColor: Color.fromARGB(223, 255, 255, 255),
+      body: Center(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            Container(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  CircleAvatar(
+                    radius: 80,
+                    backgroundImage: AssetImage('assets/image1.jpg'),
+                  ),
+                  SizedBox(height: 20),
+                  Text(
+                    userEmail,
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
+                  SizedBox(height: 20),
+                  FutureBuilder<DocumentSnapshot>(
+                    future: FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(user?.uid)
+                        .get(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return CircularProgressIndicator();
+                      }
+
+                      if (snapshot.hasError) {
+                        return Text('Error fetching user data');
+                      }
+
+                      String userBio = snapshot.data?['bio'] ?? '';
+
+                      return Text(
+                        userBio,
+                        style: TextStyle(fontSize: 18),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 20),
+            Text(
+              'My Artworks',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            Expanded(
+              child: FutureBuilder<DocumentSnapshot>(
+                future: FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(user?.uid)
+                    .get(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return CircularProgressIndicator();
+                  }
+
+                  if (snapshot.hasError) {
+                    return Text('Error fetching user data');
+                  }
+
+                  final userData = snapshot.data;
+                  if (userData == null ||
+                      !userData.exists ||
+                      userData['artworks'] == null) {
+                    return Center(
+                      child: Text('No artworks uploaded yet'),
+                    );
+                  }
+
+                  List<String> artworkIds =
+                      List<String>.from(userData['artworks']);
+
+                  if (artworkIds.isEmpty) {
+                    return Center(
+                      child: Text('No artworks uploaded yet'),
+                    );
+                  }
+
+                  return ListView.builder(
+                    itemCount: artworkIds.length,
+                    itemBuilder: (context, index) {
+                      return FutureBuilder<DocumentSnapshot>(
+                        future: FirebaseFirestore.instance
+                            .collection('artworks')
+                            .doc(artworkIds[index])
+                            .get(),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return CircularProgressIndicator();
+                          }
+
+                          if (snapshot.hasError) {
+                            return Container(
+                              child: Text('Error fetching artwork details'),
+                            );
+                          }
+
+                          if (!snapshot.hasData || !snapshot.data!.exists) {
+                            return Container(
+                              child: Text('Artwork not found'),
+                            );
+                          }
+
+                          String description =
+                              snapshot.data?['description'] ?? '';
+                          String imageUrl = snapshot.data?['imageUrl'] ?? '';
+
+                          return ListTile(
+                            title: Text(description),
+                            subtitle: Container(
+                              height: 200,
+                              width: 200,
+                              child: Image.network(imageUrl),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
